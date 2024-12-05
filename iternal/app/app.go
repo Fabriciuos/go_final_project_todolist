@@ -1,13 +1,12 @@
 package app
 
 import (
-	"Go/iternal/database"
-	handlers "Go/iternal/transport/rest"
-
-	"github.com/go-chi/chi"
-
 	"fmt"
 	"net/http"
+
+	"github.com/Fabriciuos/go_final_project_todolist/iternal/database"
+	handlers "github.com/Fabriciuos/go_final_project_todolist/iternal/transport/rest"
+	"github.com/go-chi/chi"
 )
 
 func Run() {
@@ -16,7 +15,7 @@ func Run() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Запускаем сервер!")
+	fmt.Println("Запускаем сервер на порте 7540")
 
 	r.Handle("/*", http.FileServer(http.Dir("./web")))
 	r.HandleFunc("/api/task/done", handlers.DoneTask)

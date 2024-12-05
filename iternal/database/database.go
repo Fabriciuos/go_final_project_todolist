@@ -1,11 +1,12 @@
 package database
 
 import (
-	"Go/iternal/services"
 	"database/sql"
+	"errors"
 	"log"
 	"os"
 
+	"github.com/Fabriciuos/go_final_project_todolist/iternal/nextdate"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -51,7 +52,7 @@ func CreateDB() (*sql.DB, error) {
 	return db, nil
 }
 
-func PutTaskInDB(task services.Task) (int64, error) {
+func PutTaskInDB(task nextdate.Task) (int64, error) {
 	db, err := sql.Open("sqlite3", dbFile)
 	if err != nil {
 		return 0, err
@@ -89,18 +90,31 @@ func GetCountOfTasks() (int, error) {
 	return int(count), nil
 }
 
-func GetAllTasks() (*sql.Rows, error) {
+func GetAllTasks() ([]nextdate.Task, error) {
+	var tasks []nextdate.Task
 	db, err := sql.Open("sqlite3", dbFile)
 	if err != nil {
 		return nil, err
 	}
 	defer db.Close()
 
-	rows, err := db.Query("SELECT * FROM scheduler ORDER BY date")
+	rows, err := db.Query("SELECT id, date, title, comment, repeat FROM scheduler ORDER BY date LIMIT 50")
 	if err != nil {
 		return nil, err
 	}
-	return rows, nil
+	defer rows.Close()
+	for rows.Next() {
+		var task nextdate.Task
+		err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+		if err != nil {
+			return nil, errors.New("ошибка с базой данных")
+		}
+		tasks = append(tasks, task)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return tasks, nil
 }
 
 func GetTask(id string) (*sql.Row, error) {
@@ -115,7 +129,7 @@ func GetTask(id string) (*sql.Row, error) {
 	return row, nil
 }
 
-func EditTask(task services.Task) error {
+func EditTask(task nextdate.Task) error {
 	db, err := sql.Open("sqlite3", dbFile)
 	if err != nil {
 		return err
@@ -131,36 +145,6 @@ func EditTask(task services.Task) error {
 }
 
 func DeleteTask(id string) error {
-	db, err := sql.Open("sqlite3", dbFile)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	_, err = db.Exec("DELETE FROM scheduler WHERE id=?", id)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func UpdateDate(task services.Task) error {
-	db, err := sql.Open("sqlite3", dbFile)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	_, err = db.Exec("UPDATE scheduler SET date = ? WHERE id=?", task.Date, task.ID)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func DelTask(id string) error {
 	db, err := sql.Open("sqlite3", dbFile)
 	if err != nil {
 		return err
