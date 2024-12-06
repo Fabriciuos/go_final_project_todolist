@@ -17,16 +17,24 @@ var (
 	TimeFormat string = nextdate.TimeFormat
 )
 
-func Task(w http.ResponseWriter, r *http.Request) {
+type TaskService struct {
+	service database.TaskStorage
+}
+
+func NewTaskService(store database.TaskStorage) TaskService {
+	return TaskService{service: store}
+}
+
+func (t TaskService) Task(w http.ResponseWriter, r *http.Request) {
 	var task nextdate.Task
 	var buf bytes.Buffer
 	var date time.Time
 
 	if r.Method == http.MethodGet {
-		GetTaskByID(w, r)
+		t.service.GetAllTasks()
 		return
 	} else if r.Method == http.MethodDelete {
-		DeleteTask(w, r)
+		t.DeleteTask(w, r)
 		return
 	}
 
@@ -71,11 +79,11 @@ func Task(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if r.Method == http.MethodPut {
-		EditTask(w, r, task)
+		t.EditTask(w, r, task)
 		return
 	}
 
-	id, err := database.PutTaskInDB(task)
+	id, err := t.service.PutTaskInDB(task)
 	if err != nil {
 		callError("ошибка с базой данных", w)
 		return
@@ -92,17 +100,17 @@ func Task(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func GetTasks(w http.ResponseWriter, r *http.Request) {
+func (t TaskService) GetTasks(w http.ResponseWriter, r *http.Request) {
 	tasks := []nextdate.Task{}
 
-	count, err := database.GetCountOfTasks()
+	count, err := t.service.GetCountOfTasks()
 	if err != nil {
 		callError("ошибка с базой данных", w)
 		return
 	}
 
 	if count > 0 {
-		tasks, err = database.GetAllTasks()
+		tasks, err = t.service.GetAllTasks()
 		if err != nil {
 			callError("ошибка с базой данных", w)
 			return
@@ -139,11 +147,11 @@ func NextDeadLine(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func GetTaskByID(w http.ResponseWriter, r *http.Request) {
+func (t TaskService) GetTaskByID(w http.ResponseWriter, r *http.Request) {
 	var task nextdate.Task
 
 	id := r.FormValue("id")
-	row, err := database.GetTask(id)
+	row, err := t.service.GetTask(id)
 	if err != nil {
 		callError("ошибка с базой данных", w)
 		return
@@ -170,16 +178,16 @@ func GetTaskByID(w http.ResponseWriter, r *http.Request) {
 	w.Write(resp)
 }
 
-func EditTask(w http.ResponseWriter, h *http.Request, task nextdate.Task) {
+func (t TaskService) EditTask(w http.ResponseWriter, h *http.Request, task nextdate.Task) {
 	var checkerrortask nextdate.Task
-	row, _ := database.GetTask(task.ID)
+	row, _ := t.service.GetTask(task.ID)
 	err := row.Scan(&checkerrortask.ID, &checkerrortask.Date, &checkerrortask.Title, &checkerrortask.Comment, &checkerrortask.Repeat)
 	if err != nil {
 		callError("задача не найдена", w)
 		return
 
 	}
-	err = database.EditTask(task)
+	err = t.service.EditTask(task)
 	if err != nil {
 		callError("ошибка подключения к базе данных", w)
 		return
@@ -190,13 +198,13 @@ func EditTask(w http.ResponseWriter, h *http.Request, task nextdate.Task) {
 
 }
 
-func DoneTask(w http.ResponseWriter, r *http.Request) {
+func (t TaskService) DoneTask(w http.ResponseWriter, r *http.Request) {
 	var task nextdate.Task
 
 	now, _ := time.Parse(TimeFormat, time.Now().Format(TimeFormat))
 
 	id := r.FormValue("id")
-	row, err := database.GetTask(id)
+	row, err := t.service.GetTask(id)
 	if err != nil {
 		callError("ошибка с базой данных", w)
 		return
@@ -209,7 +217,7 @@ func DoneTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if task.Repeat == "" {
-		err = database.DeleteTask(task.ID)
+		err = t.service.DeleteTask(task.ID)
 		if err != nil {
 			callError("не получилоось отметить задачу выполненной", w)
 			return
@@ -224,7 +232,7 @@ func DoneTask(w http.ResponseWriter, r *http.Request) {
 		callError("не получилось найти следующую дату", w)
 		return
 	}
-	err = database.EditTask(task)
+	err = t.service.EditTask(task)
 	if err != nil {
 		callError("не получилось обновить дату в задаче", w)
 		return
@@ -233,11 +241,11 @@ func DoneTask(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte("{}"))
 }
 
-func DeleteTask(w http.ResponseWriter, r *http.Request) {
+func (t TaskService) DeleteTask(w http.ResponseWriter, r *http.Request) {
 	var task nextdate.Task
 
 	id := r.FormValue("id")
-	row, err := database.GetTask(id)
+	row, err := t.service.GetTask(id)
 	if err != nil {
 		callError("ошибка с базой данных", w)
 		return
@@ -249,7 +257,7 @@ func DeleteTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = database.DeleteTask(task.ID)
+	err = t.service.DeleteTask(task.ID)
 	if err != nil {
 		callError("не получилось удалить задачу", w)
 		return
