@@ -1,13 +1,14 @@
 package app
 
 import (
-	"Go/iternal/database"
-	handlers "Go/iternal/transport/rest"
-
-	"github.com/go-chi/chi"
-
+	"database/sql"
 	"fmt"
 	"net/http"
+
+	"github.com/Fabriciuos/go_final_project_todolist/iternal/database"
+	handlers "github.com/Fabriciuos/go_final_project_todolist/iternal/transport/rest"
+	"github.com/go-chi/chi"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func Run() {
@@ -16,13 +17,20 @@ func Run() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Запускаем сервер!")
+	db, err := sql.Open("sqlite3", "project.db")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+	store := database.NewTaskStorage(db)
+	service := handlers.NewTaskService(store)
+	fmt.Println("Запускаем сервер на порте 7540")
 
 	r.Handle("/*", http.FileServer(http.Dir("./web")))
-	r.HandleFunc("/api/task/done", handlers.DoneTask)
-	r.HandleFunc("/api/task", handlers.Task)
+	r.HandleFunc("/api/task/done", service.DoneTask)
+	r.HandleFunc("/api/task", service.Task)
 	r.HandleFunc("/api/nextdate", handlers.NextDeadLine)
-	r.HandleFunc("/api/tasks", handlers.GetTasks)
+	r.HandleFunc("/api/tasks", service.GetTasks)
 
 	err = http.ListenAndServe(":7540", r)
 	if err != nil {

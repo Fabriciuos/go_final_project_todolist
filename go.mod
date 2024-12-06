@@ -1,4 +1,4 @@
-module Go
+module github.com/Fabriciuos/go_final_project_todolist
 
 go 1.22.4
 
@@ -6,7 +6,7 @@ require (
 	github.com/go-chi/chi v1.5.5
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/mattn/go-sqlite3 v1.14.24
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 )
 
 require (
