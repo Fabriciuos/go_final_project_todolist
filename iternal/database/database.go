@@ -1,17 +1,27 @@
 package database
 
 import (
-	"Go/iternal/services"
 	"database/sql"
+	"errors"
 	"log"
 	"os"
 
+	"github.com/Fabriciuos/go_final_project_todolist/iternal/nextdate"
 	_ "github.com/mattn/go-sqlite3"
 )
 
 const (
 	dbFile = "project.db"
+	limit  = "50"
 )
+
+type TaskStorage struct {
+	db *sql.DB
+}
+
+func NewTaskStorage(db *sql.DB) TaskStorage {
+	return TaskStorage{db: db}
+}
 
 func CreateDB() (*sql.DB, error) {
 	//appPath, err := os.Executable()
@@ -51,14 +61,8 @@ func CreateDB() (*sql.DB, error) {
 	return db, nil
 }
 
-func PutTaskInDB(task services.Task) (int64, error) {
-	db, err := sql.Open("sqlite3", dbFile)
-	if err != nil {
-		return 0, err
-	}
-	defer db.Close()
-
-	res, err := db.Exec("INSERT INTO scheduler (date, title, comment, repeat) VALUES (:date, :title, :comment, :repeat)",
+func (t TaskStorage) PutTaskInDB(task nextdate.Task) (int64, error) {
+	res, err := t.db.Exec("INSERT INTO scheduler (date, title, comment, repeat) VALUES (:date, :title, :comment, :repeat)",
 		sql.Named("date", task.Date),
 		sql.Named("title", task.Title),
 		sql.Named("comment", task.Comment),
@@ -75,54 +79,45 @@ func PutTaskInDB(task services.Task) (int64, error) {
 	return id, nil
 }
 
-func GetCountOfTasks() (int, error) {
+func (t TaskStorage) GetCountOfTasks() (int, error) {
 	var count int64
-	db, err := sql.Open("sqlite3", dbFile)
-	if err != nil {
-		return 0, err
-	}
-	defer db.Close()
 
-	row := db.QueryRow("SELECT count(*) FROM scheduler")
+	row := t.db.QueryRow("SELECT count(*) FROM scheduler")
 	_ = row.Scan(&count)
 
 	return int(count), nil
 }
 
-func GetAllTasks() (*sql.Rows, error) {
-	db, err := sql.Open("sqlite3", dbFile)
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
+func (t TaskStorage) GetAllTasks() ([]nextdate.Task, error) {
+	var tasks []nextdate.Task
 
-	rows, err := db.Query("SELECT * FROM scheduler ORDER BY date")
+	rows, err := t.db.Query("SELECT id, date, title, comment, repeat FROM scheduler ORDER BY date LIMIT ?", limit)
 	if err != nil {
 		return nil, err
 	}
-	return rows, nil
+	defer rows.Close()
+	for rows.Next() {
+		var task nextdate.Task
+		err := rows.Scan(&task.ID, &task.Date, &task.Title, &task.Comment, &task.Repeat)
+		if err != nil {
+			return nil, errors.New("ошибка с базой данных")
+		}
+		tasks = append(tasks, task)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return tasks, nil
 }
 
-func GetTask(id string) (*sql.Row, error) {
-	db, err := sql.Open("sqlite3", dbFile)
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-
-	row := db.QueryRow("SELECT * FROM scheduler WHERE id=?", id)
+func (t TaskStorage) GetTask(id string) (*sql.Row, error) {
+	row := t.db.QueryRow("SELECT * FROM scheduler WHERE id=?", id)
 
 	return row, nil
 }
 
-func EditTask(task services.Task) error {
-	db, err := sql.Open("sqlite3", dbFile)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	_, err = db.Exec("UPDATE scheduler SET date = ?, title = ?, comment = ?, repeat = ? WHERE id = ?", task.Date, task.Title, task.Comment, task.Repeat, task.ID)
+func (t TaskStorage) EditTask(task nextdate.Task) error {
+	_, err := t.db.Exec("UPDATE scheduler SET date = ?, title = ?, comment = ?, repeat = ? WHERE id = ?", task.Date, task.Title, task.Comment, task.Repeat, task.ID)
 	if err != nil {
 		return err
 	}
@@ -130,44 +125,8 @@ func EditTask(task services.Task) error {
 	return nil
 }
 
-func DeleteTask(id string) error {
-	db, err := sql.Open("sqlite3", dbFile)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	_, err = db.Exec("DELETE FROM scheduler WHERE id=?", id)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func UpdateDate(task services.Task) error {
-	db, err := sql.Open("sqlite3", dbFile)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	_, err = db.Exec("UPDATE scheduler SET date = ? WHERE id=?", task.Date, task.ID)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func DelTask(id string) error {
-	db, err := sql.Open("sqlite3", dbFile)
-	if err != nil {
-		return err
-	}
-	defer db.Close()
-
-	_, err = db.Exec("DELETE FROM scheduler WHERE id=?", id)
+func (t TaskStorage) DeleteTask(id string) error {
+	_, err := t.db.Exec("DELETE FROM scheduler WHERE id=?", id)
 	if err != nil {
 		return err
 	}
